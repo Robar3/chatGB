@@ -12,7 +12,7 @@ public class ChatServer {
     private final List<ClientHandler> clients;
 
     public ChatServer() {
-        authService = new InMemoryAuthService();  //TODO
+        authService = new InMemoryAuthService();
         clients = new ArrayList<>();
         authService.start();
     }
@@ -41,9 +41,21 @@ public class ChatServer {
     }
 
     public void broadcast(String message) {
-        for (ClientHandler client: clients) {
-            client.sendMessage(message);
+        if (message.startsWith("/w")){
+            String[] split = message.split(" ");
+            ClientHandler client =clients.stream()
+                    .filter(a -> split[1].equals(a.getNick()))
+                    .findFirst()
+                    .orElse(null);
+            if (client!=null){
+               client.sendMessage(split[2]);
+            }
+        }else {
+            for (ClientHandler client: clients) {
+                client.sendMessage(message);
+            }
         }
+
     }
 
     public void subscribe(ClientHandler client) {
