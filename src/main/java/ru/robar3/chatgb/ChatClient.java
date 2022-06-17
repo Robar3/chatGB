@@ -1,5 +1,7 @@
 package ru.robar3.chatgb;
 
+import javafx.application.Platform;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -12,35 +14,54 @@ public class ChatClient {
     private DataOutputStream out;
 
     private ClientController controller;
-    public ChatClient(ClientController controller){
-        this.controller=controller;
+
+    public ChatClient(ClientController controller) {
+        this.controller = controller;
     }
 
-    public void openConnection() throws IOException {
-        socket =new Socket("localhost",8189);
-        in=new DataInputStream(socket.getInputStream());
-        out=new DataOutputStream(socket.getOutputStream());
-        new Thread(()->{
+    public void openConnection() throws Exception {
+        socket = new Socket("localhost", 8189);
+        in = new DataInputStream(socket.getInputStream());
+        out = new DataOutputStream(socket.getOutputStream());
+        Thread thread = new Thread(() -> {
             try {
                 waitAuth();
                 readMessage();
-            }finally {
+            } finally {
                 closeConnection();
             }
-          
-        }).start();
+
+
+        });
+        thread.setDaemon(true);
+        thread.start();
     }
 
     private void closeConnection() {
     }
 
     private void readMessage() {
-        while (true){
+        while (true) {
             try {
                 String msg = in.readUTF();
-                if ("/end".equals(msg)){
-                    controller.toggleBoxesVisibility(false);
-                    break;
+                System.out.println("Receive message: " + msg);
+                if (Command.isCommand(msg)) {
+                    Command command = Command.getCommand(msg);
+                    String[] parse = command.parse(msg);
+
+
+                    if (command == Command.END) {
+                        controller.toggleBoxesVisibility(false);
+                        break;
+                    }
+                    if (command == Command.ERROR) {
+                        Platform.runLater(()->controller.showError(parse));
+                        continue;
+                    }
+                    if (command==Command.CLIENTS){
+                        controller.updateClientList(parse);
+                        continue;
+                    }
                 }
                 controller.addMessage(msg);
             } catch (IOException e) {
@@ -50,15 +71,21 @@ public class ChatClient {
     }
 
     private void waitAuth() {
-        while (true){
+        while (true) {
             try {
                 final String msg = in.readUTF();
-                if (msg.startsWith("/authok")){
-                    String[] split = msg.split(" ");
-                    nick = split[1];
-                    controller.addMessage("Успешная авторизация под ником: "+ nick);
-                    controller.toggleBoxesVisibility(true);
-                    break;
+                if (Command.isCommand(msg)) {
+                    Command command = Command.getCommand(msg);
+                    String[] params = command.parse(msg);
+                    if (command == Command.AUTHOK) {
+                        nick = params[0];
+                        controller.addMessage("Успешная авторизация под ником: " + nick);
+                        controller.toggleBoxesVisibility(true);
+                        break;
+                    }
+                    if (command == Command.ERROR) {
+                        Platform.runLater(() -> controller.showError(params));
+                    }
                 }
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -68,12 +95,17 @@ public class ChatClient {
 
     public void sendMessage(String message) {
         try {
-            if (nick != null && !message.startsWith("/")){
-                message=this.nick+": "+ message;
+            if (nick != null && !message.startsWith("/")) {
+                message = this.nick + ": " + message;
             }
             out.writeUTF(message);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public void sendMessage(Command command, String... params) {
+        sendMessage(command.collectMessage(params));
+        ;
     }
 }
