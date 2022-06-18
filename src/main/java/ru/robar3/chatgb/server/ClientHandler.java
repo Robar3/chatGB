@@ -15,6 +15,8 @@ public class ClientHandler {
     private final DataOutputStream out;
     private AuthService authService;
 
+    private boolean isAuth=false;
+
     public ClientHandler(Socket socket, ChatServer server,AuthService authService) {
 
         try {
@@ -39,6 +41,16 @@ public class ClientHandler {
     }
 
     private void authenticate() {
+        new Thread(()->{
+            try {
+                Thread.sleep(12000);
+                if (!isAuth){
+                    closeConnection();
+                }
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }).start();
         while (true) {
             try {
                 String msg = in.readUTF();
@@ -59,6 +71,7 @@ public class ClientHandler {
                         this.nick = nick;
                         server.broadcast("Пользователь " + nick + " вошел в чат");
                         server.subscribe(this);
+                        isAuth=true;
                         break;
                     }else {
                         sendMessage(Command.ERROR,"Неверные логин и пароль");
