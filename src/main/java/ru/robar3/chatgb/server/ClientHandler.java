@@ -1,11 +1,13 @@
 package ru.robar3.chatgb.server;
 
+import ru.robar3.chatgb.ChatClient;
 import ru.robar3.chatgb.Command;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.sql.*;
 
 public class ClientHandler {
     private Socket socket;
@@ -15,9 +17,9 @@ public class ClientHandler {
     private final DataOutputStream out;
     private AuthService authService;
 
-    private boolean isAuth=false;
+    private boolean isAuth = false;
 
-    public ClientHandler(Socket socket, ChatServer server,AuthService authService) {
+    public ClientHandler(Socket socket, ChatServer server, AuthService authService) {
 
         try {
             this.socket = socket;
@@ -41,10 +43,10 @@ public class ClientHandler {
     }
 
     private void authenticate() {
-        new Thread(()->{
+        new Thread(() -> {
             try {
-                Thread.sleep(12000);
-                if (!isAuth){
+                Thread.sleep(120000);
+                if (!isAuth) {
                     closeConnection();
                 }
             } catch (InterruptedException e) {
@@ -58,28 +60,28 @@ public class ClientHandler {
                     Command command = Command.getCommand(msg);
                     String[] params = command.parse(msg);
 
-                    if (command==Command.AUTH) ;
+                    if (command == Command.AUTH) ;
                     String login = params[0];
                     String password = params[1];
                     String nick = authService.getNickByLoginAndPassword(login, password);
                     if (nick != null) {
                         if (server.isNickBusy(nick)) {
-                            sendMessage(Command.ERROR,"Польхователь уже авторизован");
+                            sendMessage(Command.ERROR, "Польхователь уже авторизован");
                             continue;
                         }
                         sendMessage("/authok " + nick);
                         this.nick = nick;
                         server.broadcast("Пользователь " + nick + " вошел в чат");
                         server.subscribe(this);
-                        isAuth=true;
+                        isAuth = true;
                         break;
-                    }else {
-                        sendMessage(Command.ERROR,"Неверные логин и пароль");
+                    } else {
+                        sendMessage(Command.ERROR, "Неверные логин и пароль");
                     }
                 }
-                } catch(IOException e){
-                    throw new RuntimeException(e);
-                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
 
         }
     }
@@ -89,22 +91,48 @@ public class ClientHandler {
     }
 
     private void readMessage() {
-        while (true){
+        while (true) {
             try {
                 final String msg = in.readUTF();
-                if (Command.isCommand(msg)){
+                if (Command.isCommand(msg)) {
                     final Command command = Command.getCommand(msg);
                     String[] params = command.parse(msg);
-                    if (command ==Command.END){
+                    if (command == Command.END) {
                         break;
                     }
-                   if (command==Command.PRIVATE_MESSAGE){
-                       server.sendMessageToClient(this,params[0],params[1]);
-                       continue;
-                   }
+                    if (command == Command.PRIVATE_MESSAGE) {
+                        server.sendMessageToClient(this, params[0], params[1]);
+                        continue;
+                    }
+                    if (command == Command.CHANGE_NICK) {
+                        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:users.db");
+                             PreparedStatement statementNick = connection.prepareStatement("SELECT * FROM users WHERE nick=?");
+                             PreparedStatement statementUpdateNick = connection.prepareStatement("UPDATE users SET nick=? WHERE nick=?")) {
+                            statementNick.setString(1, params[0]);
+                            statementUpdateNick.setString(1, params[0]);
+                            statementUpdateNick.setString(2, this.getNick());
+                            ResultSet set = statementNick.executeQuery();
+                            int count = 0;
+                            while (set.next()) {
+                                count++;
+                            }
+                            if (count == 0) {
+                                statementUpdateNick.executeUpdate();
+                                server.unsubscribe(this);
+                                nick=params[0];
+                                server.subscribe(this);
+                            } else {
+                                sendMessage(Command.ERROR, "Ник уже занят");
+                            }
+
+                        } catch (SQLException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
                 }
-                System.out.println("Получено сообщение: "+msg);
+                System.out.println("Получено сообщение: " + msg);
                 server.broadcast(msg);
+
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -139,9 +167,9 @@ public class ClientHandler {
 
     }
 
-    public void sendMessage(String  message) {
+    public void sendMessage(String message) {
         try {
-            System.out.println("Отправляю сообщение: "+message);
+            System.out.println("Отправляю сообщение: " + message);
             out.writeUTF(message);
         } catch (IOException e) {
             throw new RuntimeException(e);

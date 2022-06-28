@@ -1,7 +1,9 @@
 package ru.robar3.chatgb.server;
 
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+
 
 public class InMemoryAuthService implements AuthService {
 
@@ -20,21 +22,24 @@ public class InMemoryAuthService implements AuthService {
     }
     @Override
     public String getNickByLoginAndPassword(String login, String password) {
-        for (UserData user:users) {
-            if (user.login.equals(login)&&user.password.equals(password)){
-                return user.nick;
+        try(Connection connection = DriverManager.getConnection("jdbc:sqlite:users.db");
+            PreparedStatement statement = connection.prepareStatement("SELECT * FROM  users WHERE login=? AND password=?")) {
+            statement.setString(1,login);
+            statement.setString(2,password);
+            ResultSet rs = statement.executeQuery();
+            if (rs.next()){
+                String nick = rs.getString("nick");
+                return nick;
+            }else {
+                return null;
             }
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e+"sql exwption");
+
         }
-        return null;
     }
 
-    @Override
-    public void start() {
-        users=new ArrayList<>();
-        for (int i = 0; i < 5; i++) {
-            users.add(new UserData("login"+i,"pass"+i,"nick"+i));
-        }
-    }
 
     @Override
     public void close() {

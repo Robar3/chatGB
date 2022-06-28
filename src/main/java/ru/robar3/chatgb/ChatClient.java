@@ -15,6 +15,7 @@ public class ChatClient {
 
     private ClientController controller;
 
+
     public ChatClient(ClientController controller) {
         this.controller = controller;
     }
@@ -62,7 +63,12 @@ public class ChatClient {
                         controller.updateClientList(parse);
                         continue;
                     }
+//                    if (command==Command.CHANGE_NICK){
+//                        ChatClient.this.nick=parse[0];
+//                        continue;
+//                    }
                 }
+
                 controller.addMessage(msg);
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -97,6 +103,13 @@ public class ChatClient {
         try {
             if (nick != null && !message.startsWith("/")) {
                 message = this.nick + ": " + message;
+            }else  if (Command.isCommand(message)) {
+                Command command = Command.getCommand(message);
+                String[] params = command.parse(message);
+                if (command==Command.CHANGE_NICK){
+                    this.nick=params[0];
+                }
+
             }
             out.writeUTF(message);
         } catch (IOException e) {
@@ -106,6 +119,7 @@ public class ChatClient {
 
     public void sendMessage(Command command, String... params) {
         sendMessage(command.collectMessage(params));
-        ;
+
     }
+
 }
