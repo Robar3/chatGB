@@ -2,13 +2,23 @@ package ru.robar3.chatgb;
 
 import javafx.application.Platform;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.Socket;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Collections;
+import java.util.GregorianCalendar;
+import java.util.LinkedList;
+import java.util.List;
+
+import javafx.collections.transformation.SortedList;
+import org.apache.commons.io.input.ReversedLinesFileReader;
 
 public class ChatClient {
     private String nick;
+    private String login;
     private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
@@ -42,6 +52,7 @@ public class ChatClient {
     }
 
     private void readMessage() {
+        showChatLog();
         while (true) {
             try {
                 String msg = in.readUTF();
@@ -63,10 +74,6 @@ public class ChatClient {
                         controller.updateClientList(parse);
                         continue;
                     }
-//                    if (command==Command.CHANGE_NICK){
-//                        ChatClient.this.nick=parse[0];
-//                        continue;
-//                    }
                 }
 
                 controller.addMessage(msg);
@@ -103,11 +110,18 @@ public class ChatClient {
         try {
             if (nick != null && !message.startsWith("/")) {
                 message = this.nick + ": " + message;
+                chatLog(message);
             }else  if (Command.isCommand(message)) {
                 Command command = Command.getCommand(message);
                 String[] params = command.parse(message);
                 if (command==Command.CHANGE_NICK){
-                    this.nick=params[0];
+
+                    if (renameFile((String.format("log%s.txt",nick)),String.format("log%s.txt",params[0]))){
+                        this.nick=params[0];
+                    }else {
+                        controller.showError(new String[]{"Не удалось изменить ник"});
+                    }
+
                 }
 
             }
@@ -122,4 +136,40 @@ public class ChatClient {
 
     }
 
+    public void chatLog(String msg){
+        GregorianCalendar cannes = new GregorianCalendar();
+        DateFormat df = new SimpleDateFormat("dd MMM yyy kk mm ss");
+        String fileName = String.format("log%s.txt",nick);
+        try (BufferedWriter writer = new BufferedWriter(new
+                FileWriter(fileName,true))){
+            writer.write(( df.format(cannes.getTime()))+" "+msg+"\n");
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    public void showChatLog(){
+        try (ReversedLinesFileReader reader = new ReversedLinesFileReader(new File(String.format("log%s.txt",nick)),Charset.defaultCharset());
+        ){
+            List<String>lines;
+            lines = reader.readLines(100);
+            if (lines != null) {
+                Collections.reverse(lines);
+                for (String line: lines) {
+                    controller.addMessage(line);
+                }
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    public boolean renameFile(String LastPath, String newPath){
+        File file = new File(LastPath);
+        File newFile = new File(newPath);
+       return file.renameTo(newFile);
+    }
 }

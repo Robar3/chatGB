@@ -1,6 +1,5 @@
 package ru.robar3.chatgb.server;
 
-import ru.robar3.chatgb.ChatClient;
 import ru.robar3.chatgb.Command;
 
 import java.io.DataInputStream;

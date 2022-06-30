@@ -12,7 +12,7 @@ public class UIClient extends Application {
     public void start(Stage stage) throws IOException {
         FXMLLoader fxmlLoader = new FXMLLoader(UIClient.class.getResource("chat-ui.fxml"));
         Scene scene = new Scene(fxmlLoader.load(), 600, 400);
-        stage.setTitle("Hello!");
+        stage.setTitle("Chat!");
         stage.setScene(scene);
         stage.show();
     }
