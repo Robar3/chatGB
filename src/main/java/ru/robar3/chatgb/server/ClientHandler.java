@@ -104,7 +104,7 @@ public class ClientHandler {
                         continue;
                     }
                     if (command == Command.CHANGE_NICK) {
-                        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:users.db");
+                        try (Connection connection =authService.getConnection();
                              PreparedStatement statementNick = connection.prepareStatement("SELECT * FROM users WHERE nick=?");
                              PreparedStatement statementUpdateNick = connection.prepareStatement("UPDATE users SET nick=? WHERE nick=?")) {
                             statementNick.setString(1, params[0]);

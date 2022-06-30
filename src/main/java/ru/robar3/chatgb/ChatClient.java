@@ -115,7 +115,6 @@ public class ChatClient {
                 Command command = Command.getCommand(message);
                 String[] params = command.parse(message);
                 if (command==Command.CHANGE_NICK){
-
                     if (renameFile((String.format("log%s.txt",nick)),String.format("log%s.txt",params[0]))){
                         this.nick=params[0];
                     }else {

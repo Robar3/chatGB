@@ -9,6 +9,16 @@ public class InMemoryAuthService implements AuthService {
 
     private List<UserData> users;
 
+    private Connection connection;
+
+    {
+        try {
+            connection = DriverManager.getConnection("jdbc:sqlite:users.db");
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private static class UserData{
          String login;
          String password;
@@ -22,8 +32,7 @@ public class InMemoryAuthService implements AuthService {
     }
     @Override
     public String getNickByLoginAndPassword(String login, String password) {
-        try(Connection connection = DriverManager.getConnection("jdbc:sqlite:users.db");
-            PreparedStatement statement = connection.prepareStatement("SELECT * FROM  users WHERE login=? AND password=?")) {
+        try(PreparedStatement statement = connection.prepareStatement("SELECT * FROM  users WHERE login=? AND password=?")) {
             statement.setString(1,login);
             statement.setString(2,password);
             ResultSet rs = statement.executeQuery();
@@ -44,5 +53,9 @@ public class InMemoryAuthService implements AuthService {
     @Override
     public void close() {
         System.out.println("Сервис аутентификации остановлен");
+    }
+
+    public Connection getConnection() {
+        return connection;
     }
 }
