@@ -1,8 +1,10 @@
 package ru.robar3.chatgb;
 
+import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
@@ -13,6 +15,8 @@ public class ClientController {
 
     private final ChatClient client;
     @FXML
+    private ListView<String> clientList;
+    @FXML
     private  HBox loginBox;
     @FXML
     private  TextField loginField;
@@ -21,7 +25,7 @@ public class ClientController {
     @FXML
     private  Button authButton;
     @FXML
-    private  VBox messageBox;
+    private  HBox messageBox;
     @FXML
     private  TextArea messageArea;
     @FXML
@@ -33,13 +37,19 @@ public class ClientController {
         this.client = new ChatClient(this);
         try {
             client.openConnection();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        } catch (Exception e) {
+            showNotification();
         }
     }
 
+    private void showNotification() {
+        final Alert alert = new Alert(Alert.AlertType.ERROR,"Не могу подключиться к севрверу.\n"+
+                "Проверьте,что сервер запущен", new ButtonType("Пробовать еще",ButtonBar.ButtonData.OK_DONE),
+                new ButtonType("Выйти",ButtonBar.ButtonData.CANCEL_CLOSE));
+        alert.setTitle("Ошибка подключения");
+    }
     public void authButtonClick(ActionEvent actionEvent) {
-        client.sendMessage("/auth "+loginField.getText()+" " +passwordField.getText());
+        client.sendMessage(Command.AUTH,loginField.getText(),passwordField.getText());
     }
 
     public void sendButtonClick(ActionEvent actionEvent) {
@@ -60,5 +70,27 @@ public class ClientController {
     public void toggleBoxesVisibility(boolean isSuccess) {
         loginBox.setVisible(!isSuccess);
         messageBox.setVisible(isSuccess);
+    }
+
+    public void showError(String[] error) {
+        Alert alert = new Alert(Alert.AlertType.ERROR, error[0], new ButtonType("OK", ButtonBar.ButtonData.OK_DONE));
+        alert.setTitle("Ошибка");
+        alert.showAndWait();
+    }
+
+
+    public void selectClient(MouseEvent mouseEvent) {
+        if (mouseEvent.getClickCount()==2){
+            final String msg = textField.getText();
+            final String nick=  clientList.getSelectionModel().getSelectedItem();
+            textField.setText(Command.PRIVATE_MESSAGE.collectMessage(nick,msg));
+            textField.requestFocus();
+            textField.selectEnd();
+        }
+    }
+
+    public void updateClientList(String[] params) {
+        clientList.getItems().clear();
+        clientList.getItems().addAll(params);
     }
 }

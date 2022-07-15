@@ -1,5 +1,7 @@
 package ru.robar3.chatgb.server;
 
+import ru.robar3.chatgb.Command;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -12,6 +14,8 @@ public class ClientHandler {
     private final DataInputStream in;
     private final DataOutputStream out;
     private AuthService authService;
+
+    private boolean isAuth=false;
 
     public ClientHandler(Socket socket, ChatServer server,AuthService authService) {
 
@@ -37,38 +41,67 @@ public class ClientHandler {
     }
 
     private void authenticate() {
-        while (true){
+        new Thread(()->{
             try {
-                String msg = in.readUTF();
-                if (msg.startsWith("/auth"));
-                String[] s = msg.split(" ");
-                String login = s[1];
-                String password = s[2];
-                String nick = authService.getNickByLoginAndPassword(login, password);
-                if (nick!=null){
-                    if (server.isNickBusy(nick)){
-                        sendMessage("Польхователь уже авторизован");
-                        continue;
-                    }
-                    sendMessage("/authok "+nick);
-                    this.nick=nick;
-                    server.broadcast("Пользователь "+nick+" вошел в чат");
-                    server.subscribe(this);
-                    break;
+                Thread.sleep(12000);
+                if (!isAuth){
+                    closeConnection();
                 }
-            } catch (IOException e) {
+            } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
+        }).start();
+        while (true) {
+            try {
+                String msg = in.readUTF();
+                if (Command.isCommand(msg)) {
+                    Command command = Command.getCommand(msg);
+                    String[] params = command.parse(msg);
+
+                    if (command==Command.AUTH) ;
+                    String login = params[0];
+                    String password = params[1];
+                    String nick = authService.getNickByLoginAndPassword(login, password);
+                    if (nick != null) {
+                        if (server.isNickBusy(nick)) {
+                            sendMessage(Command.ERROR,"Польхователь уже авторизован");
+                            continue;
+                        }
+                        sendMessage("/authok " + nick);
+                        this.nick = nick;
+                        server.broadcast("Пользователь " + nick + " вошел в чат");
+                        server.subscribe(this);
+                        isAuth=true;
+                        break;
+                    }else {
+                        sendMessage(Command.ERROR,"Неверные логин и пароль");
+                    }
+                }
+                } catch(IOException e){
+                    throw new RuntimeException(e);
+                }
+
         }
     }
 
+    public void sendMessage(Command command, String... params) {
+        sendMessage(command.collectMessage(params));
+    }
 
     private void readMessage() {
         while (true){
             try {
                 final String msg = in.readUTF();
-                if ("/end".equals(msg)){
-                    break;
+                if (Command.isCommand(msg)){
+                    final Command command = Command.getCommand(msg);
+                    String[] params = command.parse(msg);
+                    if (command ==Command.END){
+                        break;
+                    }
+                   if (command==Command.PRIVATE_MESSAGE){
+                       server.sendMessageToClient(this,params[0],params[1]);
+                       continue;
+                   }
                 }
                 System.out.println("Получено сообщение: "+msg);
                 server.broadcast(msg);
@@ -79,7 +112,7 @@ public class ClientHandler {
     }
 
     private void closeConnection() {
-        sendMessage("/end");
+        sendMessage(Command.END);
 
         if (in != null) {
             try {
